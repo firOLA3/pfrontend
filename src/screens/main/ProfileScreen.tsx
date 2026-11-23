@@ -3,22 +3,27 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Modal,
   TextInput,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { MainTabParamList } from '../../types/navigation.types';
+import { CompositeScreenProps } from '@react-navigation/native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { MainTabParamList, RootStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing } from '../../theme';
 import { ArrowRightIcon } from '../../components/icons';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Profile'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, 'Profile'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
-export const ProfileScreen: React.FC<Props> = () => {
+export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { user, logout, deleteAccount } = useAuth();
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -63,7 +68,11 @@ export const ProfileScreen: React.FC<Props> = () => {
         <Text style={styles.title}>Profile</Text>
 
         {/* User Card */}
-        <View style={styles.userCard}>
+        <TouchableOpacity
+          style={styles.userCard}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('EditProfile')}
+        >
           <View style={styles.avatarCircle}>
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
@@ -74,24 +83,44 @@ export const ProfileScreen: React.FC<Props> = () => {
               <Text style={styles.levelBadgeText}>Level 1 · Free Tier</Text>
             </View>
           </View>
-        </View>
+          <ArrowRightIcon size={20} color={colors.textMuted} />
+        </TouchableOpacity>
 
         {/* Settings & Menu List */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionHeading}>Preferences</Text>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Settings')}
+          >
             <Text style={styles.menuItemLabel}>Notifications & Reminders</Text>
             <ArrowRightIcon size={18} color={colors.textMuted} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.7}
+            onPress={() =>
+              Alert.alert(
+                'Connected Devices',
+                'Apple Health and device synchronization is enabled for automatic workout recording.'
+              )
+            }
+          >
             <Text style={styles.menuItemLabel}>Connected Devices (Apple Health)</Text>
             <ArrowRightIcon size={18} color={colors.textMuted} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuItemLabel}>Appearance (Light / Dark)</Text>
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.7}
+            onPress={() =>
+              Alert.alert('Appearance', 'PulseFit uses modern Light mode by default.')
+            }
+          >
+            <Text style={styles.menuItemLabel}>Appearance (Light Mode)</Text>
             <ArrowRightIcon size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
@@ -99,7 +128,16 @@ export const ProfileScreen: React.FC<Props> = () => {
         <View style={styles.menuSection}>
           <Text style={styles.sectionHeading}>Support & Legal</Text>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.7}
+            onPress={() =>
+              Alert.alert(
+                'Help & Support',
+                'Need assistance with your workouts or account? Email support@pulsefit.app'
+              )
+            }
+          >
             <Text style={styles.menuItemLabel}>Help & Support</Text>
             <ArrowRightIcon size={18} color={colors.textMuted} />
           </TouchableOpacity>

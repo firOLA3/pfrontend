@@ -28,7 +28,15 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Main: undefined;
   WorkoutPlayer: { workoutSlug: string; workoutTitle: string; durationMinutes?: number };
+  WorkoutPreview: { workoutSlug: string; workoutTitle?: string };
+  ProgramPreview: { programSlug: string; programTitle?: string };
+  SavedWorkouts: undefined;
+  WorkoutHistory: undefined;
   Notifications: undefined;
   Menu: undefined;
+  EditProfile: undefined;
+  MyPlan: undefined;
+  Achievements: undefined;
+  Settings: undefined;
 };
 

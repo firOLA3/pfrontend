@@ -1,5 +1,27 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest } from './api';
 import { IWorkout, IProgram, IPlan } from '../types/workout.types';
+
+export interface ISessionPayload {
+  clientSessionId: string;
+  workoutSlug: string;
+  workoutTitle: string;
+  durationSeconds: number;
+  caloriesBurned: number;
+  exercisesCompleted?: number;
+  totalExercises?: number;
+  feedback?: 'too_easy' | 'just_right' | 'too_hard' | null;
+  status?: 'completed' | 'abandoned';
+  notes?: string;
+  completedAt?: string;
+}
+
+export interface ISessionRecord extends ISessionPayload {
+  _id: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface WorkoutQueryParams {
   category?: string;
@@ -145,5 +167,49 @@ export const workoutService = {
       method: 'POST',
       requiresAuth: true,
     });
+  },
+
+  async saveSession(payload: ISessionPayload): Promise<{ success: boolean; data: ISessionRecord; stats?: any }> {
+    return apiRequest<{ success: boolean; data: ISessionRecord; stats?: any }>('/workouts/sessions', {
+      method: 'POST',
+      body: payload,
+      requiresAuth: true,
+    });
+  },
+
+  async getSessions(page = 1, limit = 20): Promise<{ success: boolean; count: number; total: number; data: ISessionRecord[] }> {
+    return apiRequest<{ success: boolean; count: number; total: number; data: ISessionRecord[] }>(
+      `/workouts/sessions?page=${page}&limit=${limit}`,
+      {
+        method: 'GET',
+        requiresAuth: true,
+      }
+    );
+  },
+
+  async syncOfflineSessions(): Promise<number> {
+    try {
+      const existing = await AsyncStorage.getItem('@pulsefit_offline_sessions');
+      if (!existing) return 0;
+      const list: ISessionPayload[] = JSON.parse(existing);
+      if (!Array.isArray(list) || list.length === 0) return 0;
+
+      const remaining: ISessionPayload[] = [];
+      let syncedCount = 0;
+
+      for (const sess of list) {
+        try {
+          await this.saveSession(sess);
+          syncedCount++;
+        } catch {
+          remaining.push(sess);
+        }
+      }
+
+      await AsyncStorage.setItem('@pulsefit_offline_sessions', JSON.stringify(remaining));
+      return syncedCount;
+    } catch {
+      return 0;
+    }
   },
 };

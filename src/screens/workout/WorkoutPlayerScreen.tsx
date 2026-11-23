@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Modal,
   Image,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../../types/navigation.types';
@@ -133,6 +133,14 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
   const [pauseModalVisible, setPauseModalVisible] = useState(false);
   const [endEarlyModalVisible, setEndEarlyModalVisible] = useState(false);
 
+  const sessionIdRef = useRef<string>(
+    `session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+  );
+
+  useEffect(() => {
+    workoutService.syncOfflineSessions();
+  }, []);
+
   // Load real workout if slug provided
   useEffect(() => {
     const loadWorkoutData = async () => {
@@ -247,26 +255,41 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const finishWorkout = async () => {
+  const finishWorkout = async (isEarly = false) => {
+    if (isEarly) {
+      setEndEarlyModalVisible(false);
+    }
     setState('complete');
-    // Save to offline storage & try sync to backend
+
     const sessionRecord = {
-      clientSessionId: `session_${Date.now()}`,
+      clientSessionId: sessionIdRef.current,
+      workoutSlug: route.params.workoutSlug || 'workout',
       workoutTitle,
       durationSeconds: totalElapsedSeconds,
       caloriesBurned: Math.round(totalCaloriesBurned),
+      exercisesCompleted: currentStepIndex + 1,
+      totalExercises: steps.length,
+      feedback: feedback || undefined,
+      status: (isEarly ? 'abandoned' : 'completed') as 'completed' | 'abandoned',
       completedAt: new Date().toISOString(),
-      feedback,
     };
 
     try {
-      // 1. Local backup
-      const existing = await AsyncStorage.getItem('@pulsefit_offline_sessions');
-      const list = existing ? JSON.parse(existing) : [];
-      list.push(sessionRecord);
-      await AsyncStorage.setItem('@pulsefit_offline_sessions', JSON.stringify(list));
+      // 1. Live server synchronization
+      const res = await workoutService.saveSession(sessionRecord);
+      if (res.success && res.stats) {
+        updateUser({ stats: res.stats });
+      }
+    } catch {
+      // 2. Offline queue backup for automatic sync when network restores
+      try {
+        const existing = await AsyncStorage.getItem('@pulsefit_offline_sessions');
+        const list = existing ? JSON.parse(existing) : [];
+        list.push(sessionRecord);
+        await AsyncStorage.setItem('@pulsefit_offline_sessions', JSON.stringify(list));
+      } catch {}
 
-      // 2. Update user stats in memory
+      // Optimistic in-memory update
       if (user) {
         updateUser({
           stats: {
@@ -276,9 +299,25 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
           },
         });
       }
-    } catch {
-      // Offline safe
     }
+  };
+
+  const handleFeedbackSelect = async (fId: 'too_easy' | 'just_right' | 'too_hard') => {
+    setFeedback(fId);
+    try {
+      await workoutService.saveSession({
+        clientSessionId: sessionIdRef.current,
+        workoutSlug: route.params.workoutSlug || 'workout',
+        workoutTitle,
+        durationSeconds: totalElapsedSeconds,
+        caloriesBurned: Math.round(totalCaloriesBurned),
+        exercisesCompleted: currentStepIndex + 1,
+        totalExercises: steps.length,
+        feedback: fId,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+      });
+    } catch {}
   };
 
   const formatTime = (secs: number) => {
@@ -344,7 +383,7 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
               <TouchableOpacity
                 key={f.id}
                 style={[styles.feedbackBtn, feedback === f.id && styles.feedbackBtnSelected]}
-                onPress={() => setFeedback(f.id as any)}
+                onPress={() => handleFeedbackSelect(f.id as any)}
               >
                 <Text style={styles.feedbackEmoji}>{f.emoji}</Text>
                 <Text style={[styles.feedbackLabel, feedback === f.id && styles.feedbackLabelSelected]}>
@@ -520,7 +559,7 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
               You’ve done {currentStepIndex + 1} of {steps.length} exercises.
             </Text>
             <View style={styles.modalButtonGroup}>
-              <TouchableOpacity style={styles.modalPrimaryBtn} onPress={finishWorkout}>
+              <TouchableOpacity style={styles.modalPrimaryBtn} onPress={() => finishWorkout(true)}>
                 <Text style={styles.modalPrimaryBtnText}>Save and Finish</Text>
               </TouchableOpacity>
               <TouchableOpacity

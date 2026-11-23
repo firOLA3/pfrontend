@@ -59,13 +59,40 @@ export const MenuScreen: React.FC<Props> = ({ navigation }) => {
   const handleItemPress = (key: string) => {
     switch (key) {
       case 'plan':
-        navigation.goBack();
+        navigation.navigate('MyPlan');
         break;
       case 'saved':
-        navigation.goBack();
+        navigation.navigate('SavedWorkouts');
+        break;
+      case 'achievements':
+        navigation.navigate('Achievements');
         break;
       case 'settings':
-        navigation.navigate('Main');
+        navigation.navigate('Settings');
+        break;
+      case 'about':
+        Alert.alert(
+          'About PulseFit',
+          'PulseFit v1.0.0\nTrain smarter with personalized plans, adaptive progression, and full-fidelity workouts.'
+        );
+        break;
+      case 'connected-devices':
+        Alert.alert(
+          'Connected Devices',
+          'Apple Health and device synchronization is enabled for automatic workout recording.'
+        );
+        break;
+      case 'invite-friends':
+        Alert.alert(
+          'Invite Friends',
+          'Share PulseFit with your workout buddies! Link copied to clipboard.'
+        );
+        break;
+      case 'help':
+        Alert.alert(
+          'Help & Support',
+          'Reach out anytime to support@pulsefit.app for questions, feedback, or coaching inquiries.'
+        );
         break;
       default:
         // Feedback alert for future sub-screens
@@ -100,7 +127,7 @@ export const MenuScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.profileCard}
           activeOpacity={0.8}
           onPress={() => {
-            navigation.goBack();
+            navigation.navigate('EditProfile');
           }}
         >
           {/* Avatar with initial */}

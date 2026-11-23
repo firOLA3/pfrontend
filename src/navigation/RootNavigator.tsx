@@ -7,8 +7,16 @@ import { AuthNavigator } from './AuthNavigator';
 import { OnboardingNavigator } from './OnboardingNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import { WorkoutPlayerScreen } from '../screens/workout/WorkoutPlayerScreen';
+import { WorkoutPreviewScreen } from '../screens/workout/WorkoutPreviewScreen';
+import { ProgramPreviewScreen } from '../screens/program/ProgramPreviewScreen';
+import { SavedWorkoutsScreen } from '../screens/workout/SavedWorkoutsScreen';
+import { WorkoutHistoryScreen } from '../screens/workout/WorkoutHistoryScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { MenuScreen } from '../screens/menu/MenuScreen';
+import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
+import { MyPlanScreen } from '../screens/plan/MyPlanScreen';
+import { AchievementsScreen } from '../screens/achievements/AchievementsScreen';
+import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -43,6 +51,38 @@ export const RootNavigator: React.FC = () => {
           animation: 'slide_from_bottom',
         }}
       />
+      {/* Workout Preview Screen (Figma #2341:722) */}
+      <Stack.Screen
+        name="WorkoutPreview"
+        component={WorkoutPreviewScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      {/* Program Preview Screen (Figma #2341:580) */}
+      <Stack.Screen
+        name="ProgramPreview"
+        component={ProgramPreviewScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      {/* Saved Workouts Screen (Figma #2342:1253) */}
+      <Stack.Screen
+        name="SavedWorkouts"
+        component={SavedWorkoutsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      {/* Workout History Screen (Figma #2353:1810) */}
+      <Stack.Screen
+        name="WorkoutHistory"
+        component={WorkoutHistoryScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
       {/* Notifications Screen (Figma #2425:867) */}
       <Stack.Screen
         name="Notifications"
@@ -57,6 +97,38 @@ export const RootNavigator: React.FC = () => {
         component={MenuScreen}
         options={{
           animation: 'slide_from_left',
+        }}
+      />
+      {/* Edit Profile Screen (Figma #2426:1469) */}
+      <Stack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      {/* My Plan Screen */}
+      <Stack.Screen
+        name="MyPlan"
+        component={MyPlanScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      {/* Achievements Screen (Figma #2353:1601) */}
+      <Stack.Screen
+        name="Achievements"
+        component={AchievementsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      {/* Settings Screen (Figma #2420:935 & #2420:1296) */}
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          animation: 'slide_from_right',
         }}
       />
     </Stack.Navigator>

@@ -5,11 +5,12 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -21,6 +22,8 @@ import {
   SearchIcon,
   CloseIcon,
   TimeIcon,
+  FlameIcon,
+  BookmarkIcon,
   ArrowRightIcon,
 } from '../../components/icons';
 
@@ -29,7 +32,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-const CATEGORIES = ['All', 'Strength', 'Cardio', 'HIIT', 'Flexibility', 'Core'];
+const CATEGORIES = ['All', 'Strength', 'Cardio', 'HIIT', 'Yoga', 'Core'];
 
 const FALLBACK_WORKOUTS: IWorkout[] = [
   {
@@ -82,12 +85,12 @@ const FALLBACK_WORKOUTS: IWorkout[] = [
   },
   {
     slug: 'hiit-cardio',
-    title: 'HIIT Cardio Blast',
+    title: 'HIIT Cardio',
     category: 'hiit',
-    difficulty: 'beginner',
+    difficulty: 'intermediate',
     description: 'Fast-paced interval session designed to spike heart rate.',
-    durationMinutes: 25,
-    estimatedCalories: 260,
+    durationMinutes: 30,
+    estimatedCalories: 300,
     badge: 'High Energy',
     bannerImage: '',
     primaryMuscles: ['cardiovascular', 'quads', 'abs'],
@@ -97,8 +100,24 @@ const FALLBACK_WORKOUTS: IWorkout[] = [
     tags: ['hiit', 'cardio'],
   },
   {
+    slug: 'morning-yoga-flow',
+    title: 'Morning Yoga Flow',
+    category: 'yoga',
+    difficulty: 'beginner',
+    description: 'Gentle opening flow for morning mobility and breathing.',
+    durationMinutes: 25,
+    estimatedCalories: 180,
+    badge: 'Yoga',
+    bannerImage: '',
+    primaryMuscles: ['hamstrings', 'shoulders', 'spine'],
+    equipment: ['mat'],
+    steps: [],
+    isFeatured: true,
+    tags: ['yoga', 'flexibility'],
+  },
+  {
     slug: 'core-and-stability',
-    title: 'Core & Stability Flow',
+    title: 'Core & Stability',
     category: 'core',
     difficulty: 'intermediate',
     description: 'Strengthen deep core stabilizers and lower back support.',
@@ -119,18 +138,20 @@ export const ExploreScreen: React.FC<Props> = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [workouts, setWorkouts] = useState<IWorkout[]>(FALLBACK_WORKOUTS);
   const [featuredProgram, setFeaturedProgram] = useState<IProgram | null>(null);
+  const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchWorkoutsAndPrograms = useCallback(async () => {
     try {
       setLoading(true);
-      const [workoutsRes, programsRes] = await Promise.allSettled([
+      const [workoutsRes, programsRes, savedRes] = await Promise.allSettled([
         workoutService.getWorkouts({
           category: selectedCategory !== 'All' ? selectedCategory.toLowerCase() : undefined,
           search: searchQuery.trim() || undefined,
         }),
         workoutService.getPrograms({ featured: true }),
+        workoutService.getSavedWorkouts(),
       ]);
 
       if (workoutsRes.status === 'fulfilled' && workoutsRes.value.success && workoutsRes.value.data.length > 0) {
@@ -138,7 +159,9 @@ export const ExploreScreen: React.FC<Props> = ({ navigation }) => {
       } else {
         // Fallback filter
         const filtered = FALLBACK_WORKOUTS.filter((w) => {
-          const matchCat = selectedCategory === 'All' || w.category.toLowerCase() === selectedCategory.toLowerCase();
+          const matchCat =
+            selectedCategory === 'All' ||
+            w.category.toLowerCase() === selectedCategory.toLowerCase();
           const matchSearch =
             !searchQuery.trim() ||
             w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -150,6 +173,10 @@ export const ExploreScreen: React.FC<Props> = ({ navigation }) => {
 
       if (programsRes.status === 'fulfilled' && programsRes.value.success && programsRes.value.data.length > 0) {
         setFeaturedProgram(programsRes.value.data[0]);
+      }
+
+      if (savedRes.status === 'fulfilled' && savedRes.value.success && Array.isArray(savedRes.value.data)) {
+        setSavedSlugs(savedRes.value.data.map((w) => w.slug));
       }
     } catch {
       // Quietly use fallback on network error
@@ -168,35 +195,52 @@ export const ExploreScreen: React.FC<Props> = ({ navigation }) => {
     fetchWorkoutsAndPrograms();
   };
 
+  const toggleSave = async (slug: string) => {
+    const isSaved = savedSlugs.includes(slug);
+    const nextSaved = isSaved ? savedSlugs.filter((s) => s !== slug) : [...savedSlugs, slug];
+    setSavedSlugs(nextSaved); // Optimistic update
+
+    try {
+      if (isSaved) {
+        await workoutService.unsaveWorkout(slug);
+      } else {
+        await workoutService.saveWorkout(slug);
+      }
+    } catch {
+      // Revert if API fails
+      setSavedSlugs(savedSlugs);
+      Alert.alert('Notice', 'Could not update saved status.');
+    }
+  };
+
   const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header (Figma #2333:736) */}
       <View style={styles.header}>
         <Text style={styles.title}>Explore</Text>
-        <Text style={styles.subtitle}>Find your next session</Text>
 
-        {/* Search Bar */}
+        {/* Search Bar (Figma #2333:748) */}
         <View style={styles.searchBar}>
-          <SearchIcon size={16} color={colors.textMuted} style={styles.searchIcon} />
+          <SearchIcon size={18} color="#999999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search workouts or muscles..."
-            placeholderTextColor={colors.textMuted}
+            placeholder="Search workouts"
+            placeholderTextColor="#999999"
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
           />
           {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <CloseIcon size={16} color={colors.textMuted} />
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <CloseIcon size={16} color="#999999" />
             </TouchableOpacity>
           ) : null}
         </View>
       </View>
 
-      {/* Categories Horizontal Pills */}
+      {/* Categories Horizontal Pills (Figma #2333:783) */}
       <View style={styles.categoryContainer}>
         <FlatList
           horizontal
@@ -221,39 +265,45 @@ export const ExploreScreen: React.FC<Props> = ({ navigation }) => {
         />
       </View>
 
-      {/* Workouts & Program Content */}
+      {/* Main Content Area */}
       <View style={styles.content}>
-        {/* Featured Program Banner */}
+        {/* Featured Program Banner (Figma #2333:786 - 798) */}
         <TouchableOpacity
           style={styles.programBanner}
           activeOpacity={0.9}
           onPress={() => {
-            const firstWorkoutSlug =
-              featuredProgram?.weeks?.[0]?.schedule?.find((s) => !s.isRestDay)?.workoutSlug || 'lower-body-strength';
-            navigation.navigate('WorkoutPlayer', {
-              workoutSlug: firstWorkoutSlug,
-              workoutTitle: featuredProgram?.title || 'Goblet Squat Basics',
-              durationMinutes: 35,
+            navigation.navigate('ProgramPreview', {
+              programSlug: featuredProgram?.slug || 'core-starter',
+              programTitle: featuredProgram?.title || 'Core Starter',
             });
           }}
         >
           <View style={styles.bannerTag}>
-            <Text style={styles.bannerTagText}>FEATURED PROGRAM</Text>
+            <Text style={styles.bannerTagText}>PROGRAM · 4 WEEKS</Text>
           </View>
           <Text style={styles.bannerTitle}>
-            {featuredProgram?.title || 'Goblet Squat Basics'}
+            {featuredProgram?.title || 'Core Starter'}
           </Text>
           <Text style={styles.bannerSubtitle}>
-            {featuredProgram?.subtitle || `${featuredProgram?.durationWeeks || 4} Weeks · Build foundational strength`}
+            {featuredProgram?.description ||
+              'Build a strong base with 4 short workouts a week. Beginner friendly.'}
           </Text>
+
+          <View style={styles.bannerButtonRow}>
+            <View style={styles.viewProgramButton}>
+              <Text style={styles.viewProgramButtonText}>View program</Text>
+              <ArrowRightIcon size={14} color="#111111" style={{ marginLeft: 6 }} />
+            </View>
+          </View>
         </TouchableOpacity>
 
-        {/* Workouts List Header */}
+        {/* Section Header: Workouts for you (Figma #2333:801) */}
         <View style={styles.listHeaderRow}>
-          <Text style={styles.sectionHeader}>Featured Workouts</Text>
+          <Text style={styles.sectionHeader}>Workouts for you</Text>
           {loading && !refreshing && <ActivityIndicator size="small" color={colors.primary} />}
         </View>
 
+        {/* Workouts List */}
         <FlatList
           data={workouts}
           keyExtractor={(item: IWorkout) => item.slug}
@@ -265,44 +315,56 @@ export const ExploreScreen: React.FC<Props> = ({ navigation }) => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <SearchIcon size={36} color={colors.textMuted} style={{ marginBottom: 10 }} />
-              <Text style={styles.emptyText}>No workouts match your filter</Text>
+              <Text style={styles.emptyText}>No workouts match your search</Text>
             </View>
           }
           renderItem={({ item }: { item: IWorkout }) => {
-            const musclesText =
-              item.primaryMuscles && item.primaryMuscles.length > 0
-                ? item.primaryMuscles.map(capitalize).join(' · ')
-                : 'Full Body';
-            const count = item.steps?.length || 8;
+            const isSaved = savedSlugs.includes(item.slug);
 
             return (
               <TouchableOpacity
-                style={styles.workoutItem}
-                activeOpacity={0.85}
+                style={styles.workoutCard}
+                activeOpacity={0.88}
                 onPress={() =>
-                  navigation.navigate('WorkoutPlayer', {
+                  navigation.navigate('WorkoutPreview', {
                     workoutSlug: item.slug,
                     workoutTitle: item.title,
-                    durationMinutes: item.durationMinutes,
                   })
                 }
               >
-                <View style={styles.workoutItemLeft}>
-                  <View style={styles.badgePill}>
-                    <Text style={styles.badgePillText}>{item.badge || capitalize(item.category)}</Text>
-                  </View>
-                  <Text style={styles.workoutItemTitle}>{item.title}</Text>
-                  <Text style={styles.workoutItemMuscles}>{musclesText}</Text>
-                  <View style={styles.workoutItemMetaRow}>
-                    <TimeIcon size={13} color={colors.textMuted} style={{ marginRight: 5 }} />
-                    <Text style={styles.workoutItemMeta}>
-                      {item.durationMinutes} min · {count} exercises · {capitalize(item.difficulty)}
-                    </Text>
+                <View style={styles.cardThumbnail}>
+                  <FlameIcon size={24} />
+                </View>
+
+                <View style={styles.cardContent}>
+                  <Text style={styles.workoutTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.workoutMeta}>
+                    {item.durationMinutes} min · {capitalize(item.difficulty)}
+                  </Text>
+                  <View style={styles.calorieRow}>
+                    <FlameIcon size={12} style={{ marginRight: 4 }} />
+                    <Text style={styles.calorieText}>{item.estimatedCalories} kcal</Text>
                   </View>
                 </View>
-                <View style={styles.workoutItemArrow}>
-                  <ArrowRightIcon size={16} color={colors.textPrimary} />
-                </View>
+
+                {/* Bookmark Toggle Action */}
+                <TouchableOpacity
+                  style={styles.bookmarkButton}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  activeOpacity={0.7}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    toggleSave(item.slug);
+                  }}
+                >
+                  <BookmarkIcon
+                    size={22}
+                    color={isSaved ? '#FE2E31' : '#999999'}
+                    filled={isSaved}
+                  />
+                </TouchableOpacity>
               </TouchableOpacity>
             );
           }}
@@ -315,189 +377,185 @@ export const ExploreScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
   header: {
-    paddingHorizontal: spacing.screenPadding,
+    paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 10,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    color: '#111111',
     marginBottom: 14,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    backgroundColor: '#F7F7F7',
+    borderWidth: 1,
+    borderColor: '#ECECEC',
     borderRadius: 16,
     paddingHorizontal: 14,
     height: 48,
   },
   searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: colors.textPrimary,
-  },
-  clearSearch: {
-    fontSize: 14,
-    color: colors.textMuted,
-    padding: 4,
+    color: '#111111',
   },
   categoryContainer: {
     paddingVertical: 10,
   },
   categoryList: {
-    paddingHorizontal: spacing.screenPadding,
+    paddingHorizontal: 20,
     gap: 8,
   },
   categoryChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#F5F5F5',
   },
   categoryChipSelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#FE2E31',
   },
   categoryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textSecondary,
+    color: '#666666',
   },
   categoryTextSelected: {
-    color: colors.white,
+    color: '#FFFFFF',
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.screenPadding,
+    paddingHorizontal: 20,
   },
   programBanner: {
-    backgroundColor: '#1E293B',
-    borderRadius: 20,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 22,
     padding: 20,
     marginVertical: 12,
   },
   bannerTag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 8,
+    borderRadius: 8,
+    marginBottom: 10,
   },
   bannerTagText: {
-    color: colors.white,
+    color: '#FFD700',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   bannerTitle: {
-    color: colors.white,
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   bannerSubtitle: {
-    color: '#94A3B8',
+    color: '#CCCCCC',
     fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  bannerButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewProgramButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  viewProgramButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111111',
   },
   listHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 10,
+    marginTop: 12,
+    marginBottom: 12,
   },
   sectionHeader: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: '#111111',
   },
   workoutsList: {
-    paddingBottom: 24,
+    paddingBottom: 28,
     gap: 12,
   },
-  workoutItem: {
+  workoutCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    padding: 16,
+    backgroundColor: '#FFFBFB',
+    padding: 14,
     borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    borderWidth: 1,
+    borderColor: '#F5ECEC',
   },
-  workoutItemLeft: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  badgePill: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginBottom: 6,
-  },
-  badgePillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  workoutItemTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  workoutItemMuscles: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 6,
-  },
-  workoutItemMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  workoutItemMeta: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  workoutItemArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surfaceSecondary,
+  cardThumbnail: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#FFF5F5',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 14,
   },
-  arrowText: {
-    fontSize: 16,
-    color: colors.textPrimary,
+  cardContent: {
+    flex: 1,
+  },
+  workoutTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111111',
+    marginBottom: 4,
+  },
+  workoutMeta: {
+    fontSize: 13,
+    color: '#666666',
+    marginBottom: 4,
+  },
+  calorieRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calorieText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FE2E31',
+  },
+  bookmarkButton: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
   },
-  emptyIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
   emptyText: {
     fontSize: 14,
-    color: colors.textMuted,
+    color: '#999999',
   },
 });

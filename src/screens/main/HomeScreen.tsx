@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { CompositeScreenProps } from '@react-navigation/native';
+import { CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { MainTabParamList, RootStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
-import { workoutService } from '../../services/workout.service';
+import { authService } from '../../services/auth.service';
+import { workoutService, ISessionRecord } from '../../services/workout.service';
 import { IWorkout } from '../../types/workout.types';
 import {
   MenuIcon,
@@ -100,14 +101,44 @@ const CircularProgressRing: React.FC<CircularRingProps> = ({
 };
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [todayWorkout, setTodayWorkout] = useState<IWorkout | null>(null);
+  const [sessions, setSessions] = useState<ISessionRecord[]>([]);
 
   // Time of day greeting
   const currentHour = new Date().getHours();
   const timeGreeting =
     currentHour < 12 ? 'Good Morning' : currentHour < 18 ? 'Good Afternoon' : 'Good Evening';
   const displayName = user?.name ? user.name.split(' ')[0] : 'Kaysolo';
+
+  // Refresh user data & sessions whenever the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      const loadFreshData = async () => {
+        try {
+          const [meRes, sessionsRes] = await Promise.all([
+            authService.getMe().catch(() => null),
+            workoutService.getSessions(1, 20).catch(() => null),
+          ]);
+          if (isMounted) {
+            if (meRes?.success && meRes.data) {
+              updateUser(meRes.data);
+            }
+            if (sessionsRes?.success && Array.isArray(sessionsRes.data)) {
+              setSessions(sessionsRes.data);
+            }
+          }
+        } catch {
+          // Silent fallback
+        }
+      };
+      loadFreshData();
+      return () => {
+        isMounted = false;
+      };
+    }, [updateUser])
+  );
 
   useEffect(() => {
     const fetchTodayWorkout = async () => {
@@ -155,19 +186,35 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     fetchTodayWorkout();
   }, []);
 
-  // Stats
-  const weeklyTarget = user?.onboarding?.weeklyDays?.length || 3;
-  const totalCompleted = user?.stats?.totalWorkouts || 0;
-  const workoutsLeft = Math.max(1, weeklyTarget - (totalCompleted % weeklyTarget));
-  const goalSubtitle = `You’re ${workoutsLeft} workout${
-    workoutsLeft === 1 ? '' : 's'
-  } away from your weekly goal.`;
+  // Compute workouts completed this calendar week (Monday to Sunday)
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const distanceToMonday = (dayOfWeek + 6) % 7;
+  const mondayThisWeek = new Date(now);
+  mondayThisWeek.setDate(now.getDate() - distanceToMonday);
+  mondayThisWeek.setHours(0, 0, 0, 0);
 
-  const totalCalories = user?.stats?.totalCalories || 780;
+  const workoutsThisWeek = sessions.filter((s) => {
+    const sessionDate = new Date(s.completedAt || (s as any).createdAt || Date.now());
+    return sessionDate >= mondayThisWeek;
+  }).length;
+
+  // Weekly Goal calculation
+  const weeklyTarget = user?.onboarding?.weeklyDays?.length || 3;
+  const workoutsLeft = Math.max(0, weeklyTarget - workoutsThisWeek);
+  const goalSubtitle =
+    workoutsLeft === 0
+      ? "You've reached your weekly goal! Great job!"
+      : `You’re ${workoutsLeft} workout${
+          workoutsLeft === 1 ? '' : 's'
+        } away from your weekly goal.`;
+
+  // Real user stats with 0 fallbacks (no mock 780 or 82)
+  const totalCalories = user?.stats?.totalCalories || 0;
   const calorieGoal = 1000;
   const caloriePercent = Math.min(100, Math.round((totalCalories / calorieGoal) * 100));
 
-  const totalMinutes = user?.stats?.totalMinutes || 82;
+  const totalMinutes = user?.stats?.totalMinutes || 0;
   const minuteGoal = 60;
   const minutePercent = Math.min(100, Math.round((totalMinutes / minuteGoal) * 100));
 
@@ -311,7 +358,11 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.activitySection}>
           <View style={styles.activityHeaderRow}>
             <Text style={styles.activityTitle}>Activity Overview</Text>
-            <TouchableOpacity style={styles.todayPill} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.todayPill}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('WorkoutHistory')}
+            >
               <Text style={styles.todayPillText}>Today</Text>
               <ArrowRightIcon size={14} color="#000000" />
             </TouchableOpacity>
