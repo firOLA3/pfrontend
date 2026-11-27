@@ -52,8 +52,7 @@ export const authService = {
 
   async oauthLogin(data: {
     provider: 'google' | 'apple';
-    providerId: string;
-    email: string;
+    idToken: string;
     name?: string;
     avatarUrl?: string;
   }): Promise<AuthResponse> {

@@ -2,14 +2,17 @@
   "expo": {
     "name": "pfrontend",
     "slug": "pfrontend",
+    "scheme": "pulsefit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pulsefit.app"
     },
     "android": {
+      "package": "com.pulsefit.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -27,6 +30,12 @@
         {
           "photosPermission": "Allow PulseFit to access your photo library to choose a profile picture.",
           "cameraPermission": "Allow PulseFit to use your camera to take a profile picture."
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.REPLACE_WITH_IOS_CLIENT_ID_PREFIX"
         }
       ]
     ]

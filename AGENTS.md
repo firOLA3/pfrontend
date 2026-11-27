@@ -26,16 +26,18 @@ Run lint and typecheck before declaring any task done.
 ## Navigation & Architecture
 
 - PulseFit uses **React Navigation** (v7) with `@react-navigation/native-stack` and `@react-navigation/bottom-tabs`. Do NOT migrate to Expo Router unless explicitly requested.
-- Root navigation structure: `Auth` -> `Onboarding` -> `Main` (Bottom Tabs: `Home`, `Explore`, `Progress`, `Profile`) + Full-screen stack modals (`WorkoutPlayer`, `Notifications`, `Menu`).
-- Safe Area Insets: ALWAYS import `SafeAreaView` from `react-native-safe-area-context`, NEVER from `react-native`.
+- Navigation hierarchy: `Splash` (loading / `Auth` initial route) -> `Auth` (`Welcome`, `SignUp`, `SignIn`, `CheckEmail`, `ForgotPassword`, `ResetPassword`) -> `Onboarding` (6 steps) -> `Main` (Tabs: `Home`, `Explore`, `Progress`, `Profile`) + Root stack screens (`WorkoutPlayer`, `WorkoutPreview`, `ProgramPreview`, `SavedWorkouts`, `WorkoutHistory`, `Notifications`, `Menu`, `EditProfile`, `MyPlan`, `Achievements`, `Settings`, `ConnectedDevices`).
+- Safe Back Navigation: Always guard back buttons on root stack screens with `if (navigation.canGoBack()) navigation.goBack(); else navigation.navigate('Main');` to avoid unhandled `GO_BACK` errors.
+- Safe Area & StatusBar: ALWAYS import `SafeAreaView` from `react-native-safe-area-context`, NEVER from `react-native`. Use `expo-status-bar`'s `<StatusBar style="light" | "dark" />` without invalid `backgroundColor` prop.
 
 ## Icon Management
 - All shared vector icons live in `src/components/icons/index.tsx`.
 - Ensure every icon export has a unique identifier — never duplicate export names (`BackArrowIcon`, `CloseIcon`, `BookmarkIcon`).
 
-## Exercise Video & Media Engine
+## Exercise Video, Avatar & Media Engine
 - Use `expo-video` (`useVideoPlayer` + `VideoView`) for looping exercise videos, NOT deprecated `expo-av`.
-- Relative backend media paths (`/static/...`) must be resolved against the dynamic API origin.
+- Always resolve relative `/static/...` paths through `resolveMediaUrl()` in `src/services/api.ts`, and render profile pictures using the shared `<UserAvatar />` component (`src/components/common/UserAvatar.tsx`).
+- For `expo-image-picker`, close any React Native `<Modal>` first and wait ~260ms on native platforms (`Platform.OS !== 'web'`) before opening the camera/library picker; include Android `getPendingResultAsync()` recovery.
 
 ## Building with EAS
 

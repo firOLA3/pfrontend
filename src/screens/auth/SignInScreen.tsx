@@ -5,16 +5,17 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
+import { SocialAuthButtons } from '../../components/auth/SocialAuthButtons';
 import { colors, typography, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
@@ -127,22 +128,7 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Buttons */}
-            <View style={styles.socialGroup}>
-              <TouchableOpacity style={styles.socialButton} activeOpacity={0.85}>
-                <Text style={styles.socialButtonText}> Apple</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton} activeOpacity={0.85}>
-                <Text style={styles.socialButtonText}>Google</Text>
-              </TouchableOpacity>
-            </View>
+            <SocialAuthButtons disabled={loading} />
           </View>
 
           {/* Footer */}
@@ -243,40 +229,6 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: '600',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 14,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    paddingHorizontal: 12,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  socialGroup: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  socialButton: {
-    flex: 1,
-    height: 48,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
   },
   footer: {
     flexDirection: 'row',

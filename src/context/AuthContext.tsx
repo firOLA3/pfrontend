@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, AuthTokens } from '../types/auth.types';
 import { authService } from '../services/auth.service';
+import { signOutFromGoogle } from '../services/googleAuth.service';
 
 interface AuthContextType {
   user: User | null;
@@ -13,7 +14,7 @@ interface AuthContextType {
   resendCode: (email: string) => Promise<any>;
   forgotPassword: (email: string) => Promise<any>;
   resetPassword: (data: { email: string; code: string; newPassword: string }) => Promise<any>;
-  oauthLogin: (data: { provider: 'google' | 'apple'; providerId: string; email: string; name?: string; avatarUrl?: string }) => Promise<void>;
+  oauthLogin: (data: { provider: 'google' | 'apple'; idToken: string; name?: string; avatarUrl?: string }) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: (confirmText: string) => Promise<void>;
   updateUser: (updatedUser: Partial<User>) => void;
@@ -91,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return authService.resetPassword(data);
   };
 
-  const oauthLogin = async (data: { provider: 'google' | 'apple'; providerId: string; email: string; name?: string; avatarUrl?: string }) => {
+  const oauthLogin = async (data: { provider: 'google' | 'apple'; idToken: string; name?: string; avatarUrl?: string }) => {
     const res = await authService.oauthLogin(data);
     if (res.tokens) {
       await storeTokens(res.tokens);
@@ -105,12 +106,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authService.logout();
     } catch {}
+    await signOutFromGoogle();
     await AsyncStorage.multiRemove(['@pulsefit_access_token', '@pulsefit_refresh_token']);
     setUser(null);
   };
 
   const deleteAccount = async (confirmText: string) => {
     await authService.deleteAccount(confirmText);
+    await signOutFromGoogle();
     await AsyncStorage.multiRemove(['@pulsefit_access_token', '@pulsefit_refresh_token']);
     setUser(null);
   };
