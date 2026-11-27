@@ -169,8 +169,22 @@ export const workoutService = {
     });
   },
 
-  async saveSession(payload: ISessionPayload): Promise<{ success: boolean; data: ISessionRecord; stats?: any }> {
-    return apiRequest<{ success: boolean; data: ISessionRecord; stats?: any }>('/workouts/sessions', {
+  async saveSession(payload: ISessionPayload): Promise<{
+    success: boolean;
+    data: ISessionRecord;
+    stats?: any;
+    points?: number;
+    level?: number;
+    newlyUnlockedBadges?: Array<{ id: string; title: string; description: string }>;
+  }> {
+    return apiRequest<{
+      success: boolean;
+      data: ISessionRecord;
+      stats?: any;
+      points?: number;
+      level?: number;
+      newlyUnlockedBadges?: Array<{ id: string; title: string; description: string }>;
+    }>('/workouts/sessions', {
       method: 'POST',
       body: payload,
       requiresAuth: true,

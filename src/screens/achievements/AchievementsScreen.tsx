@@ -1,20 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
 import {
+  achievementService,
+  IAchievementsData,
+  IBadge,
+  IMilestone,
+} from '../../services/achievement.service';
+import {
   ArrowRightIcon,
   TrophyMenuIcon,
   FlameIcon,
-  ProgressTabIcon,
 } from '../../components/icons';
 import { colors, spacing } from '../../theme';
 
@@ -22,87 +29,47 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Achievements'>;
 
 type TabType = 'Badges' | 'Milestones';
 
-interface MilestoneItem {
-  id: string;
-  title: string;
-  current: number;
-  target: number;
-  unit?: string;
-  badgeType: 'workout' | 'streak' | 'calories';
-}
-
 export const AchievementsScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('Milestones');
+  const [data, setData] = useState<IAchievementsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const totalWorkouts = user?.stats?.totalWorkouts || 0;
-  const totalCalories = user?.stats?.totalCalories || 0;
-  const streakDays = (user?.stats as any)?.streakDays || (totalWorkouts > 0 ? 1 : 0);
+  const fetchAchievements = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await achievementService.getAchievements();
+      if (res.success && res.data) {
+        setData(res.data);
+      }
+    } catch {
+      // Quiet fallback
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-  const milestones: MilestoneItem[] = [
-    {
-      id: 'first_workout',
-      title: 'First workout',
-      current: Math.min(totalWorkouts, 1),
-      target: 1,
-      badgeType: 'workout',
-    },
-    {
-      id: 'streak_3',
-      title: '3-day streak',
-      current: Math.min(streakDays, 3),
-      target: 3,
-      unit: 'days',
-      badgeType: 'streak',
-    },
-    {
-      id: 'workouts_50',
-      title: '50 workouts',
-      current: Math.min(totalWorkouts, 50),
-      target: 50,
-      unit: 'workouts',
-      badgeType: 'workout',
-    },
-    {
-      id: 'cal_10k',
-      title: '10K calories burned',
-      current: Math.min(totalCalories, 10000),
-      target: 10000,
-      unit: 'kcal',
-      badgeType: 'calories',
-    },
-    {
-      id: 'streak_14',
-      title: '14-day consistency',
-      current: Math.min(streakDays, 14),
-      target: 14,
-      unit: 'days',
-      badgeType: 'streak',
-    },
-    {
-      id: 'workouts_100',
-      title: '100 workouts',
-      current: Math.min(totalWorkouts, 100),
-      target: 100,
-      unit: 'workouts',
-      badgeType: 'workout',
-    },
-  ];
+  useEffect(() => {
+    fetchAchievements();
+  }, [fetchAchievements]);
 
-  const badges = [
-    { id: 'b1', name: 'Starter', desc: 'Completed 1st workout', unlocked: totalWorkouts >= 1 },
-    { id: 'b2', name: 'On Fire', desc: '3-day streak', unlocked: streakDays >= 3 },
-    { id: 'b3', name: 'High Burn', desc: 'Burned 1,000+ kcal', unlocked: totalCalories >= 1000 },
-    { id: 'b4', name: 'Habit Hero', desc: '7-day streak', unlocked: streakDays >= 7 },
-    { id: 'b5', name: 'Century Club', desc: 'Completed 10 workouts', unlocked: totalWorkouts >= 10 },
-    { id: 'b6', name: 'Unstoppable', desc: '14-day streak', unlocked: streakDays >= 14 },
-    { id: 'b7', name: 'Titan', desc: 'Burned 10,000+ kcal', unlocked: totalCalories >= 10000 },
-    { id: 'b8', name: 'Veteran', desc: 'Completed 50 workouts', unlocked: totalWorkouts >= 50 },
-    { id: 'b9', name: 'Legend', desc: 'Completed 100 workouts', unlocked: totalWorkouts >= 100 },
-  ];
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAchievements();
+  };
 
-  const completedCount = milestones.filter((m) => m.current >= m.target).length;
-  const inProgressCount = milestones.length - completedCount;
+  const points = data?.points ?? (user?.points || 0);
+  const level = data?.level ?? (user?.level || 1);
+  const nextLevelPoints = data?.nextLevelPoints ?? (level * 500);
+  const levelProgressRatio = Math.min(1, points / Math.max(1, nextLevelPoints));
+
+  const milestones: IMilestone[] = data?.milestones || [];
+  const badges: IBadge[] = data?.badges || [];
+
+  const completedCount = data?.completedMilestones ?? milestones.filter((m) => m.completed).length;
+  const inProgressCount = data?.inProgressMilestones ?? (milestones.length - completedCount);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -110,7 +77,13 @@ export const AchievementsScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Main');
+            }
+          }}
           activeOpacity={0.7}
         >
           <View style={{ transform: [{ rotate: '180deg' }] }}>
@@ -121,61 +94,93 @@ export const AchievementsScreen: React.FC<Props> = ({ navigation }) => {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Tab Toggle Row (Figma #2353:1624) */}
-        <View style={styles.tabContainer}>
-          {(['Badges', 'Milestones'] as TabType[]).map((tab) => {
-            const isSelected = activeTab === tab;
-            return (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tabButton, isSelected && styles.tabButtonActive]}
-                onPress={() => setActiveTab(tab)}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.tabButtonText,
-                    isSelected && styles.tabButtonTextActive,
-                  ]}
-                >
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+      {loading && !refreshing && !data ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FE2E31" />
         </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#FE2E31"
+              colors={['#FE2E31']}
+            />
+          }
+        >
+          {/* Level & Points Banner */}
+          <View style={styles.levelCard}>
+            <View style={styles.levelRow}>
+              <View style={styles.levelBadgeCircle}>
+                <Text style={styles.levelNumberText}>L{level}</Text>
+              </View>
+              <View style={styles.levelTextCol}>
+                <Text style={styles.levelTitle}>Level {level} Athlete</Text>
+                <Text style={styles.levelSub}>
+                  {points.toLocaleString()} / {nextLevelPoints.toLocaleString()} points to Level {level + 1}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.levelTrack}>
+              <View
+                style={[
+                  styles.levelFill,
+                  { width: `${Math.round(levelProgressRatio * 100)}%` },
+                ]}
+              />
+            </View>
+          </View>
 
-        {/* Status Subtitle (Figma #2353:1635) */}
-        <Text style={styles.subtitle}>
-          {completedCount} completed · {inProgressCount} in progress
-        </Text>
-
-        {activeTab === 'Milestones' ? (
-          /* Milestones List (Figma #2353:1637) */
-          <View style={styles.milestonesList}>
-            {milestones.map((item) => {
-              const progressRatio = Math.min(1, item.current / item.target);
-              const isCompleted = item.current >= item.target;
-
+          {/* Tab Toggle Row (Figma #2353:1624) */}
+          <View style={styles.tabContainer}>
+            {(['Badges', 'Milestones'] as TabType[]).map((tab) => {
+              const isSelected = activeTab === tab;
               return (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tabButton, isSelected && styles.tabButtonActive]}
+                  onPress={() => setActiveTab(tab)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.tabButtonText,
+                      isSelected && styles.tabButtonTextActive,
+                    ]}
+                  >
+                    {tab}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Status Subtitle (Figma #2353:1635) */}
+          <Text style={styles.subtitle}>
+            {completedCount} completed · {inProgressCount} in progress
+          </Text>
+
+          {activeTab === 'Milestones' ? (
+            /* Milestones List (Figma #2353:1637) */
+            <View style={styles.milestonesList}>
+              {milestones.map((item) => (
                 <View key={item.id} style={styles.milestoneCard}>
                   <View style={styles.milestoneTopRow}>
                     <View
                       style={[
                         styles.milestoneIconCircle,
-                        isCompleted && styles.milestoneIconCompleted,
+                        item.completed && styles.milestoneIconCompleted,
                       ]}
                     >
-                      {item.badgeType === 'streak' ? (
+                      {item.id.includes('streak') ? (
                         <FlameIcon size={18} />
                       ) : (
                         <TrophyMenuIcon
                           size={18}
-                          color={isCompleted ? '#FE2E31' : '#888888'}
+                          color={item.completed ? '#FE2E31' : '#888888'}
                         />
                       )}
                     </View>
@@ -194,48 +199,51 @@ export const AchievementsScreen: React.FC<Props> = ({ navigation }) => {
                         <View
                           style={[
                             styles.progressFill,
-                            { width: `${Math.round(progressRatio * 100)}%` },
-                            isCompleted && styles.progressFillDone,
+                            { width: `${Math.round((item.progressRatio || 0) * 100)}%` },
+                            item.completed && styles.progressFillDone,
                           ]}
                         />
                       </View>
                     </View>
                   </View>
                 </View>
-              );
-            })}
-          </View>
-        ) : (
-          /* Badges 3x3 Grid */
-          <View style={styles.badgeGrid}>
-            {badges.map((b) => (
-              <View
-                key={b.id}
-                style={[
-                  styles.badgeCard,
-                  b.unlocked ? styles.badgeUnlocked : styles.badgeLocked,
-                ]}
-              >
+              ))}
+            </View>
+          ) : (
+            /* Badges 3x3 Grid */
+            <View style={styles.badgeGrid}>
+              {badges.map((b) => (
                 <View
+                  key={b.id}
                   style={[
-                    styles.badgeCircle,
-                    b.unlocked ? styles.badgeCircleUnlocked : styles.badgeCircleLocked,
+                    styles.badgeCard,
+                    b.unlocked ? styles.badgeUnlocked : styles.badgeLocked,
                   ]}
                 >
-                  <TrophyMenuIcon
-                    size={24}
-                    color={b.unlocked ? '#FE2E31' : '#AAAAAA'}
-                  />
+                  <View
+                    style={[
+                      styles.badgeCircle,
+                      b.unlocked ? styles.badgeCircleUnlocked : styles.badgeCircleLocked,
+                    ]}
+                  >
+                    <TrophyMenuIcon
+                      size={24}
+                      color={b.unlocked ? '#FE2E31' : '#AAAAAA'}
+                    />
+                  </View>
+                  <Text style={styles.badgeName}>{b.title}</Text>
+                  <Text style={styles.badgeDesc} numberOfLines={2}>
+                    {b.description}
+                  </Text>
+                  {b.unlocked && (
+                    <Text style={styles.unlockedDate}>Unlocked</Text>
+                  )}
                 </View>
-                <Text style={styles.badgeName}>{b.name}</Text>
-                <Text style={styles.badgeDesc} numberOfLines={2}>
-                  {b.desc}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
@@ -268,10 +276,66 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111111',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 40,
+  },
+  levelCard: {
+    backgroundColor: '#FFF5F5',
+    borderRadius: 16,
+    borderWidth: 0.8,
+    borderColor: 'rgba(254, 46, 49, 0.22)',
+    padding: 16,
+    marginBottom: 20,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  levelBadgeCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FE2E31',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  levelNumberText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  levelTextCol: {
+    flex: 1,
+  },
+  levelTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111111',
+    marginBottom: 2,
+  },
+  levelSub: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  levelTrack: {
+    height: 6,
+    backgroundColor: 'rgba(254, 46, 49, 0.15)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  levelFill: {
+    height: '100%',
+    backgroundColor: '#FE2E31',
+    borderRadius: 3,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -387,7 +451,7 @@ const styles = StyleSheet.create({
   badgeLocked: {
     backgroundColor: '#F9F9F9',
     borderColor: '#EEEEEE',
-    opacity: 0.7,
+    opacity: 0.65,
   },
   badgeCircle: {
     width: 48,
@@ -419,5 +483,11 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
     lineHeight: 12,
+    marginBottom: 4,
+  },
+  unlockedDate: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#2E7D32',
   },
 });

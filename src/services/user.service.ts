@@ -53,6 +53,17 @@ export const userService = {
     });
   },
 
+  async uploadAvatar(
+    image: string,
+    mimeType?: 'image/jpeg' | 'image/jpg' | 'image/png' | 'image/webp'
+  ): Promise<{ success: boolean; data: User }> {
+    return apiRequest<{ success: boolean; data: User }>('/users/avatar', {
+      method: 'POST',
+      body: { image, mimeType },
+      requiresAuth: true,
+    });
+  },
+
   async checkUsername(username: string): Promise<{ success: boolean; available: boolean }> {
     return apiRequest<{ success: boolean; available: boolean }>(
       `/users/check-username?username=${encodeURIComponent(username)}`,
@@ -61,6 +72,30 @@ export const userService = {
         requiresAuth: true,
       }
     );
+  },
+
+  async updateDevices(data: Partial<NonNullable<User['devices']>>): Promise<{ success: boolean; data: NonNullable<User['devices']> }> {
+    return apiRequest<{ success: boolean; data: NonNullable<User['devices']> }>('/users/devices', {
+      method: 'PUT',
+      body: data,
+      requiresAuth: true,
+    });
+  },
+
+  async updateNotificationSettings(data: Partial<NonNullable<User['notificationSettings']>>): Promise<{ success: boolean; data: NonNullable<User['notificationSettings']> }> {
+    return apiRequest<{ success: boolean; data: NonNullable<User['notificationSettings']> }>('/users/notification-settings', {
+      method: 'PUT',
+      body: data,
+      requiresAuth: true,
+    });
+  },
+
+  async savePushToken(pushToken: string): Promise<{ success: boolean; message: string }> {
+    return apiRequest<{ success: boolean; message: string }>('/users/push-token', {
+      method: 'POST',
+      body: { pushToken },
+      requiresAuth: true,
+    });
   },
 };
 

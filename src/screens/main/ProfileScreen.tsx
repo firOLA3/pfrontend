@@ -16,6 +16,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainTabParamList, RootStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing } from '../../theme';
+import { UserAvatar } from '../../components/common/UserAvatar';
 import { ArrowRightIcon } from '../../components/icons';
 
 type Props = CompositeScreenProps<
@@ -53,15 +54,6 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const initials = user?.name
-    ? user.name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'PF';
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -73,9 +65,7 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           activeOpacity={0.8}
           onPress={() => navigation.navigate('EditProfile')}
         >
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          <UserAvatar avatarUrl={user?.avatarUrl} name={user?.name} size={60} variant="primary" />
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user?.name || 'PulseFit Member'}</Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
@@ -102,12 +92,7 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() =>
-              Alert.alert(
-                'Connected Devices',
-                'Apple Health and device synchronization is enabled for automatic workout recording.'
-              )
-            }
+            onPress={() => navigation.navigate('ConnectedDevices')}
           >
             <Text style={styles.menuItemLabel}>Connected Devices (Apple Health)</Text>
             <ArrowRightIcon size={18} color={colors.textMuted} />
@@ -271,19 +256,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 20,
     gap: 16,
-  },
-  avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: colors.white,
-    fontSize: 20,
-    fontWeight: '700',
   },
   userInfo: {
     flex: 1,

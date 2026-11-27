@@ -21,6 +21,7 @@ export interface User {
     heightCm?: number;
     weightKg?: number;
     targetWeightKg?: number;
+    units?: 'metric' | 'imperial';
     healthKitConnected?: boolean;
     notificationsAllowed?: boolean;
   };
@@ -28,6 +29,29 @@ export interface User {
     totalWorkouts: number;
     totalCalories: number;
     totalMinutes: number;
+    streakDays?: number;
+    lastWorkoutDate?: string;
+  };
+  points?: number;
+  level?: number;
+  unlockedBadges?: Array<{ badgeId: string; unlockedAt: string }>;
+  devices?: {
+    appleHealth: boolean;
+    googleFit: boolean;
+    readSteps: boolean;
+    readCalories: boolean;
+    readWeight: boolean;
+    readHeartRate: boolean;
+    writeWorkouts: boolean;
+    lastSyncDate?: string;
+  };
+  pushToken?: string;
+  notificationSettings?: {
+    workoutReminders: boolean;
+    streakAlerts: boolean;
+    communityUpdates: boolean;
+    quietHoursStart: string;
+    quietHoursEnd: string;
   };
   role: 'user' | 'admin';
   createdAt: string;

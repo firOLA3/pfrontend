@@ -1,4 +1,5 @@
 export type AuthStackParamList = {
+  Splash: undefined;
   Welcome: undefined;
   SignUp: undefined;
   SignIn: undefined;
@@ -38,5 +39,6 @@ export type RootStackParamList = {
   MyPlan: undefined;
   Achievements: undefined;
   Settings: undefined;
+  ConnectedDevices: undefined;
 };
 

@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
+import { UserAvatar } from '../../components/common/UserAvatar';
 import {
   CloseIcon,
   FlameIcon,
@@ -34,9 +35,10 @@ export const MenuScreen: React.FC<Props> = ({ navigation }) => {
   const { user, logout } = useAuth();
 
   const displayName = user?.name || 'Kaysolo';
-  const initial = displayName.charAt(0).toUpperCase();
-  const username = user?.name ? user.name.toLowerCase().replace(/\s+/g, '') : 'kaysolo58';
-  const streakDays = (user as any)?.stats?.streakDays || 12;
+  const username = user?.username ? user.username.replace(/^@/, '') : (user?.name ? user.name.toLowerCase().replace(/\s+/g, '') : 'kaysolo58');
+  const streakDays = user?.stats?.streakDays || 0;
+  const userLevel = user?.level || 1;
+  const unlockedBadgesCount = user?.unlockedBadges?.length || 0;
 
   const handleLogout = () => {
     Alert.alert(
@@ -77,10 +79,7 @@ export const MenuScreen: React.FC<Props> = ({ navigation }) => {
         );
         break;
       case 'connected-devices':
-        Alert.alert(
-          'Connected Devices',
-          'Apple Health and device synchronization is enabled for automatic workout recording.'
-        );
+        navigation.navigate('ConnectedDevices');
         break;
       case 'invite-friends':
         Alert.alert(
@@ -111,7 +110,13 @@ export const MenuScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.menuHeaderTitle}>Menu</Text>
         <TouchableOpacity
           style={styles.closeButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Main');
+            }
+          }}
           activeOpacity={0.7}
         >
           <CloseIcon size={24} color="#111111" />
@@ -130,20 +135,27 @@ export const MenuScreen: React.FC<Props> = ({ navigation }) => {
             navigation.navigate('EditProfile');
           }}
         >
-          {/* Avatar with initial */}
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>{initial}</Text>
-          </View>
+          {/* Avatar with photo or initial */}
+          <UserAvatar
+            avatarUrl={user?.avatarUrl}
+            name={displayName}
+            size={52}
+            maxInitials={1}
+            variant="primary"
+            style={styles.avatarShadow}
+          />
 
           {/* User Details */}
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{displayName}</Text>
             <Text style={styles.profileHandle}>
-              @{username} · Level 3
+              @{username} · Level {userLevel}
             </Text>
             <View style={styles.streakBadge}>
               <FlameIcon size={14} style={{ marginRight: 4 }} />
-              <Text style={styles.streakText}>{streakDays} day streak</Text>
+              <Text style={styles.streakText}>
+                {streakDays > 0 ? `${streakDays} day streak` : 'Start streak'}
+              </Text>
             </View>
           </View>
 
@@ -183,7 +195,9 @@ export const MenuScreen: React.FC<Props> = ({ navigation }) => {
               <TrophyMenuIcon size={22} color="#111111" />
               <Text style={styles.menuItemText}>Achievements</Text>
             </View>
-            <Text style={styles.badgeCountText}>12 badges</Text>
+            <Text style={styles.badgeCountText}>
+              {unlockedBadgesCount > 0 ? `${unlockedBadgesCount} / 12 badges` : '12 badges'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -320,23 +334,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(254, 46, 49, 0.15)',
     marginBottom: 26,
   },
-  avatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FE2E31',
-    alignItems: 'center',
-    justifyContent: 'center',
+  avatarShadow: {
     shadowColor: '#FE2E31',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 3,
-  },
-  avatarInitial: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   profileInfo: {
     flex: 1,

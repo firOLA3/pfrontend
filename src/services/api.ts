@@ -21,6 +21,26 @@ const getBaseUrl = (): string => {
 
 export const API_BASE_URL = getBaseUrl();
 
+/**
+ * Resolves a backend-relative static path (e.g. `/static/avatars/...`) or absolute/local/data URI
+ * into a displayable media URL.
+ */
+export function resolveMediaUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('data:') ||
+    url.startsWith('file://') ||
+    url.startsWith('content://') ||
+    url.startsWith('blob:')
+  ) {
+    return url;
+  }
+  const base = API_BASE_URL.replace(/\/api\/?$/, '');
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 export interface ApiRequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: any;

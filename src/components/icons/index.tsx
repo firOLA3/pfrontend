@@ -554,3 +554,51 @@ export const CameraIcon: React.FC<IconProps> = ({ size = 20, color = '#FFFFFF', 
     <Circle cx="12" cy="13" r="4" stroke={color} strokeWidth="1.8" />
   </Svg>
 );
+
+// 36. PulseFit Logo Icon (Figma #2294:233)
+export const PulseFitLogoIcon: React.FC<IconProps> = ({
+  width = 72,
+  height = 44,
+  color = '#FFFFFF',
+  style,
+}) => (
+  <Svg width={width} height={height} viewBox="0 0 71 38" fill="none" style={style}>
+    <Path
+      d="M2.21801 19.9692H17.7496L24.406 2.21881L35.5 35.5008L44.3752 11.094L48.8128 19.9692H68.782"
+      stroke={color}
+      strokeWidth={4.4376}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+// 37. Photo Library Icon (Figma #2430:421 Profile photo modal)
+export const PhotoLibraryIcon: React.FC<IconProps> = ({ size = 22, color = '#111111', style }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+    <Rect x="3" y="3" width="18" height="18" rx="3" stroke={color} strokeWidth="1.8" />
+    <Circle cx="8.5" cy="8.5" r="1.5" fill={color} />
+    <Path
+      d="M21 15L16.5 10.5C15.9 9.9 14.9 9.9 14.3 10.5L6 18.8"
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+// 38. Trash / Remove Icon (Figma #2430:421 Remove current photo)
+export const TrashIcon: React.FC<IconProps> = ({ size = 22, color = '#D4161A', style }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+    <Path
+      d="M3 6H21M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6M19 6L18.1 19.1C18.04 20.17 17.16 21 16.1 21H7.9C6.84 21 5.96 20.17 5.9 19.1L5 6"
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path d="M10 11V16M14 11V16" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+  </Svg>
+);
+

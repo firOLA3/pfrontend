@@ -17,6 +17,8 @@ import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
 import { MyPlanScreen } from '../screens/plan/MyPlanScreen';
 import { AchievementsScreen } from '../screens/achievements/AchievementsScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
+import { ConnectedDevicesScreen } from '../screens/devices/ConnectedDevicesScreen';
+import { SplashScreen } from '../screens/auth/SplashScreen';
 import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -25,11 +27,7 @@ export const RootNavigator: React.FC = () => {
   const { user, isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <SplashScreen isInitialLoading />;
   }
 
   return (
@@ -127,6 +125,14 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      {/* Connected Devices Screen (Figma #2420:343) */}
+      <Stack.Screen
+        name="ConnectedDevices"
+        component={ConnectedDevicesScreen}
         options={{
           animation: 'slide_from_right',
         }}

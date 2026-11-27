@@ -20,6 +20,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow PulseFit to access your photo library to choose a profile picture.",
+          "cameraPermission": "Allow PulseFit to use your camera to take a profile picture."
+        }
+      ]
+    ]
   }
 }

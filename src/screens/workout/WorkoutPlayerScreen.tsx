@@ -16,7 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { colors, spacing } from '../../theme';
 import { apiRequest, API_BASE_URL } from '../../services/api';
 import { workoutService } from '../../services/workout.service';
-import { PauseIcon, CloseIcon, CheckIcon, FlameIcon } from '../../components/icons';
+import { PauseIcon, CloseIcon, CheckIcon, FlameIcon, TrophyMenuIcon } from '../../components/icons';
 import { ExerciseMediaViewer } from '../../components/exercise/ExerciseMediaViewer';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WorkoutPlayer'>;
@@ -128,6 +128,9 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
   const [totalElapsedSeconds, setTotalElapsedSeconds] = useState(0);
   const [totalCaloriesBurned, setTotalCaloriesBurned] = useState(0);
   const [feedback, setFeedback] = useState<'too_easy' | 'just_right' | 'too_hard' | null>(null);
+  const [newlyUnlockedBadges, setNewlyUnlockedBadges] = useState<
+    Array<{ id: string; title: string; description: string; icon?: string }>
+  >([]);
 
   // Modals
   const [pauseModalVisible, setPauseModalVisible] = useState(false);
@@ -278,7 +281,14 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
       // 1. Live server synchronization
       const res = await workoutService.saveSession(sessionRecord);
       if (res.success && res.stats) {
-        updateUser({ stats: res.stats });
+        updateUser({
+          stats: res.stats,
+          points: res.points,
+          level: res.level,
+        });
+        if (res.newlyUnlockedBadges && res.newlyUnlockedBadges.length > 0) {
+          setNewlyUnlockedBadges(res.newlyUnlockedBadges);
+        }
       }
     } catch {
       // 2. Offline queue backup for automatic sync when network restores
@@ -305,7 +315,7 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleFeedbackSelect = async (fId: 'too_easy' | 'just_right' | 'too_hard') => {
     setFeedback(fId);
     try {
-      await workoutService.saveSession({
+      const res = await workoutService.saveSession({
         clientSessionId: sessionIdRef.current,
         workoutSlug: route.params.workoutSlug || 'workout',
         workoutTitle,
@@ -317,6 +327,9 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
         status: 'completed',
         completedAt: new Date().toISOString(),
       });
+      if (res.newlyUnlockedBadges && res.newlyUnlockedBadges.length > 0) {
+        setNewlyUnlockedBadges(res.newlyUnlockedBadges);
+      }
     } catch {}
   };
 
@@ -372,6 +385,32 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
 
+          {/* Badge Celebration Card (Phase 2.2) */}
+          {newlyUnlockedBadges.length > 0 && (
+            <View style={styles.badgeCelebrationContainer}>
+              {newlyUnlockedBadges.map((badge) => (
+                <View key={badge.id} style={styles.badgeCelebrationCard}>
+                  <View style={styles.badgeCelebrationIconCircle}>
+                    <TrophyMenuIcon size={26} color="#FE2E31" />
+                  </View>
+                  <View style={styles.badgeCelebrationTextCol}>
+                    <Text style={styles.badgeCelebrationTag}>🏆 NEW BADGE UNLOCKED!</Text>
+                    <Text style={styles.badgeCelebrationTitle}>{badge.title}</Text>
+                    <Text style={styles.badgeCelebrationDesc}>{badge.description}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Points & Level Gain Pill (Phase 2.1) */}
+          <View style={styles.pointsEarnedPill}>
+            <FlameIcon size={16} color="#FE2E31" />
+            <Text style={styles.pointsEarnedText}>
+              +{50 + (user?.stats?.streakDays || 1) * 10} XP Earned · Level {user?.level || 1}
+            </Text>
+          </View>
+
           {/* Feedback Section (too easy / just right / too hard) */}
           <Text style={styles.feedbackTitle}>How was the workout?</Text>
           <View style={styles.feedbackRow}>
@@ -396,7 +435,13 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity
             style={styles.doneButton}
             activeOpacity={0.85}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('Main');
+              }
+            }}
           >
             <Text style={styles.doneButtonText}>Finish & Save</Text>
           </TouchableOpacity>
@@ -566,7 +611,11 @@ export const WorkoutPlayerScreen: React.FC<Props> = ({ navigation, route }) => {
                 style={styles.modalSecondaryBtn}
                 onPress={() => {
                   setEndEarlyModalVisible(false);
-                  navigation.goBack();
+                  if (navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else {
+                    navigation.navigate('Main');
+                  }
                 }}
               >
                 <Text style={styles.modalSecondaryBtnText}>Discard</Text>
@@ -842,6 +891,71 @@ const styles = StyleSheet.create({
     width: 1,
     height: 30,
     backgroundColor: colors.border,
+  },
+  badgeCelebrationContainer: {
+    width: '100%',
+    marginBottom: 16,
+    gap: 10,
+  },
+  badgeCelebrationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1.5,
+    borderColor: '#FE2E31',
+    borderRadius: 18,
+    padding: 14,
+    gap: 14,
+  },
+  badgeCelebrationIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FE2E31',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  badgeCelebrationTextCol: {
+    flex: 1,
+  },
+  badgeCelebrationTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FE2E31',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  badgeCelebrationTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  badgeCelebrationDesc: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  pointsEarnedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 20,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#FFD1D2',
+  },
+  pointsEarnedText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FE2E31',
   },
   feedbackTitle: {
     fontSize: 15,

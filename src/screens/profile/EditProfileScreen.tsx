@@ -10,14 +10,61 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  TouchableWithoutFeedback,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/user.service';
-import { ArrowRightIcon, CameraIcon } from '../../components/icons';
+import { UserAvatar } from '../../components/common/UserAvatar';
+import {
+  ArrowRightIcon,
+  CameraIcon,
+  PhotoLibraryIcon,
+  TrashIcon,
+} from '../../components/icons';
 import { colors, spacing } from '../../theme';
+
+const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ['images'],
+  allowsEditing: true,
+  aspect: [1, 1],
+  quality: 0.7,
+  base64: true,
+};
+
+const assetToBase64Payload = async (
+  asset: ImagePicker.ImagePickerAsset
+): Promise<{ image: string; mimeType: string }> => {
+  const mimeType = asset.mimeType || 'image/jpeg';
+  if (asset.base64) {
+    return { image: asset.base64, mimeType };
+  }
+  if (asset.uri.startsWith('data:')) {
+    return { image: asset.uri, mimeType };
+  }
+
+  const response = await fetch(asset.uri);
+  const blob = await response.blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to read selected image data.'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read selected image data.'));
+    reader.readAsDataURL(blob);
+  });
+
+  return { image: dataUrl, mimeType: blob.type || mimeType };
+};
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -28,13 +75,22 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [username, setUsername] = useState(user?.username || (user?.name ? user.name.toLowerCase().replace(/\s+/g, '') : ''));
   const [bio, setBio] = useState(user?.bio || '');
   const [email] = useState(user?.email || '');
+  const [avatarUri, setAvatarUri] = useState<string | undefined>(user?.avatarUrl);
 
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [photoSheetVisible, setPhotoSheetVisible] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const initialUsername = useRef(user?.username || '');
   const usernameCheckTimer = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!isUploadingPhoto) {
+      setAvatarUri(user?.avatarUrl);
+    }
+  }, [user?.avatarUrl, isUploadingPhoto]);
 
   // Live username availability check with debounce
   useEffect(() => {
@@ -72,6 +128,121 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, [username]);
 
+  const processSelectedAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    const previousUri = avatarUri;
+    setAvatarUri(asset.uri);
+    setIsUploadingPhoto(true);
+    try {
+      const { image, mimeType } = await assetToBase64Payload(asset);
+      const res = await userService.uploadAvatar(image, mimeType as any);
+      if (res.success && res.data) {
+        updateUser(res.data);
+        setAvatarUri(res.data.avatarUrl);
+      }
+    } catch (err: any) {
+      setAvatarUri(previousUri);
+      Alert.alert(
+        'Upload Failed',
+        err?.message || 'Could not upload profile photo. Please try a smaller image.'
+      );
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  // Recover Android activity result if OS reclaimed the activity while camera/gallery was open
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    let isMounted = true;
+    ImagePicker.getPendingResultAsync()
+      .then((pending) => {
+        if (!isMounted || !pending || 'code' in pending) return;
+        if (!pending.canceled && pending.assets?.length) {
+          processSelectedAsset(pending.assets[0]);
+        }
+      })
+      .catch(() => null);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const promptPermissionSettings = (label: string, feature: string) => {
+    Alert.alert(
+      `${label} Permission Needed`,
+      `Please allow PulseFit to access your ${feature} to set a profile picture.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings() },
+      ]
+    );
+  };
+
+  const handlePickPhoto = async (source: 'camera' | 'library') => {
+    setPhotoSheetVisible(false);
+
+    // Wait for modal fade-out on native so UIKit doesn't block presenting the OS picker
+    if (Platform.OS !== 'web') {
+      await new Promise((resolve) => setTimeout(resolve, 260));
+    }
+
+    try {
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        if (!permission.canAskAgain && Platform.OS !== 'web') {
+          promptPermissionSettings(
+            source === 'camera' ? 'Camera' : 'Photo Library',
+            source === 'camera' ? 'camera' : 'photos'
+          );
+        } else {
+          Alert.alert(
+            'Permission Required',
+            `Access to your ${source === 'camera' ? 'camera' : 'photo library'} is needed to set a profile picture.`
+          );
+        }
+        return;
+      }
+
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync(PICKER_OPTIONS)
+          : await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await processSelectedAsset(result.assets[0]);
+      }
+    } catch (err: any) {
+      if (source === 'camera') {
+        Alert.alert(
+          'Camera Unavailable',
+          'Could not open camera on this device. Please choose an existing photo from your library.'
+        );
+      } else {
+        Alert.alert('Photo Selection Failed', err?.message || 'Could not open your photo library.');
+      }
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setPhotoSheetVisible(false);
+    try {
+      setIsUploadingPhoto(true);
+      const res = await userService.updateProfile({ avatarUrl: '' });
+      if (res.success && res.data) {
+        updateUser({ ...res.data, avatarUrl: undefined });
+        setAvatarUri(undefined);
+      }
+    } catch (err: any) {
+      Alert.alert('Update Failed', err?.message || 'Could not remove profile photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Validation Error', 'Full name cannot be empty.');
@@ -95,7 +266,16 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       if (res.success && res.data) {
         updateUser(res.data);
         Alert.alert('Profile Updated', 'Your profile details have been saved.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
+          {
+            text: 'OK',
+            onPress: () => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('Main');
+              }
+            },
+          },
         ]);
       }
     } catch (err: any) {
@@ -105,22 +285,19 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const initials = name
-    ? name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'PF';
-
   return (
     <SafeAreaView style={styles.container}>
       {/* Top Header Bar (Figma #2426:1469) */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Main');
+            }
+          }}
           activeOpacity={0.7}
         >
           <View style={{ transform: [{ rotate: '180deg' }] }}>
@@ -153,34 +330,35 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           {/* Avatar & Change Photo (Figma #2426:1494) */}
           <View style={styles.avatarSection}>
             <View style={styles.avatarWrapper}>
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>{initials}</Text>
-              </View>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setPhotoSheetVisible(true)}
+                disabled={isUploadingPhoto}
+              >
+                <UserAvatar avatarUrl={avatarUri} name={name} size={90} variant="soft" />
+                {isUploadingPhoto && (
+                  <View style={styles.avatarLoadingOverlay}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.cameraBadge}
                 activeOpacity={0.8}
-                onPress={() =>
-                  Alert.alert(
-                    'Profile Photo',
-                    'Choose an option',
-                    [
-                      { text: 'Take Photo', onPress: () => {} },
-                      { text: 'Choose from Library', onPress: () => {} },
-                      { text: 'Cancel', style: 'cancel' },
-                    ]
-                  )
-                }
+                disabled={isUploadingPhoto}
+                onPress={() => setPhotoSheetVisible(true)}
               >
                 <CameraIcon size={16} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
             <TouchableOpacity
-              onPress={() =>
-                Alert.alert('Profile Photo', 'Photo options: Take new photo or Choose from library.')
-              }
+              onPress={() => setPhotoSheetVisible(true)}
+              disabled={isUploadingPhoto}
               activeOpacity={0.7}
             >
-              <Text style={styles.changePhotoText}>Change photo</Text>
+              <Text style={styles.changePhotoText}>
+                {isUploadingPhoto ? 'Updating photo...' : 'Change photo'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -271,6 +449,64 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Profile Photo Action Sheet (Figma #2430:421) */}
+      <Modal
+        visible={photoSheetVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoSheetVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setPhotoSheetVisible(false)}>
+          <View style={styles.sheetBackdrop}>
+            <TouchableWithoutFeedback>
+              <View style={styles.sheetContainer}>
+                <View style={styles.sheetHandle} />
+                <Text style={styles.sheetTitle}>Profile photo</Text>
+
+                <TouchableOpacity
+                  style={styles.sheetRow}
+                  activeOpacity={0.7}
+                  onPress={() => handlePickPhoto('camera')}
+                >
+                  <CameraIcon size={22} color="#111111" />
+                  <Text style={styles.sheetRowText}>Take photo</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.sheetRow}
+                  activeOpacity={0.7}
+                  onPress={() => handlePickPhoto('library')}
+                >
+                  <PhotoLibraryIcon size={22} color="#111111" />
+                  <Text style={styles.sheetRowText}>Choose from library</Text>
+                </TouchableOpacity>
+
+                {Boolean(avatarUri) && (
+                  <TouchableOpacity
+                    style={styles.sheetRow}
+                    activeOpacity={0.7}
+                    onPress={handleRemovePhoto}
+                  >
+                    <TrashIcon size={22} color="#D4161A" />
+                    <Text style={[styles.sheetRowText, styles.sheetRowDestructive]}>
+                      Remove current photo
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={styles.sheetCancelBtn}
+                  activeOpacity={0.8}
+                  onPress={() => setPhotoSheetVisible(false)}
+                >
+                  <Text style={styles.sheetCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -325,20 +561,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: 10,
   },
-  avatarCircle: {
-    width: 90,
-    height: 90,
+  avatarLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 45,
-    backgroundColor: '#FFF0F0',
-    borderWidth: 2,
-    borderColor: '#FE2E31',
+    backgroundColor: 'rgba(17, 17, 17, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#FE2E31',
   },
   cameraBadge: {
     position: 'absolute',
@@ -430,5 +662,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 17, 17, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#DCDCDC',
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111111',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    gap: 12,
+  },
+  sheetRowText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  sheetRowDestructive: {
+    color: '#D4161A',
+  },
+  sheetCancelBtn: {
+    marginTop: 12,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sheetCancelText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111111',
   },
 });

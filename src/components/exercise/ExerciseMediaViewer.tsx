@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { colors } from '../../theme';
-import { API_BASE_URL } from '../../services/api';
+import { resolveMediaUrl } from '../../services/api';
 
 interface ExerciseMediaViewerProps {
   videoUrl?: string;
@@ -36,12 +36,7 @@ export const ExerciseMediaViewer: React.FC<ExerciseMediaViewerProps> = ({
   const [isVideoReady, setIsVideoReady] = useState(false);
 
   // Normalize absolute URL
-  const resolveUrl = (url?: string) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    const base = API_BASE_URL.replace(/\/api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
-  };
+  const resolveUrl = (url?: string) => resolveMediaUrl(url) || '';
 
   const resolvedVideo = resolveUrl(videoUrl);
   const resolvedPoster = resolveUrl(posterUrl || startImageUrl);

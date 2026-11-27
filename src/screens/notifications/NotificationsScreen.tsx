@@ -162,7 +162,13 @@ export const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.headerLeft}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('Main');
+              }
+            }}
             activeOpacity={0.7}
           >
             <BackArrowIcon size={24} color="#111111" />

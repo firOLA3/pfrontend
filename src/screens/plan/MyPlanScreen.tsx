@@ -107,7 +107,13 @@ export const MyPlanScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Main');
+            }
+          }}
           activeOpacity={0.7}
         >
           <View style={{ transform: [{ rotate: '180deg' }] }}>

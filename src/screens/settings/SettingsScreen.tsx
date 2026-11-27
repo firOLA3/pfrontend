@@ -15,18 +15,61 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
+import { userService } from '../../services/user.service';
 import { ArrowRightIcon, CloseIcon } from '../../components/icons';
 import { colors, spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, logout, deleteAccount } = useAuth();
+  const { user, updateUser, logout, deleteAccount } = useAuth();
 
-  const [workoutReminders, setWorkoutReminders] = useState<boolean>(true);
-  const [streakAlerts, setStreakAlerts] = useState<boolean>(true);
-  const [challengeUpdates, setChallengeUpdates] = useState<boolean>(false);
-  const [units, setUnits] = useState<'metric' | 'imperial'>('metric');
+  const [workoutReminders, setWorkoutReminders] = useState<boolean>(
+    user?.notificationSettings?.workoutReminders ?? true
+  );
+  const [streakAlerts, setStreakAlerts] = useState<boolean>(
+    user?.notificationSettings?.streakAlerts ?? true
+  );
+  const [challengeUpdates, setChallengeUpdates] = useState<boolean>(
+    user?.notificationSettings?.communityUpdates ?? false
+  );
+  const [units, setUnits] = useState<'metric' | 'imperial'>(
+    user?.onboarding?.units ?? 'metric'
+  );
+
+  const handleToggleNotification = async (
+    key: 'workoutReminders' | 'streakAlerts' | 'communityUpdates',
+    val: boolean
+  ) => {
+    if (key === 'workoutReminders') setWorkoutReminders(val);
+    if (key === 'streakAlerts') setStreakAlerts(val);
+    if (key === 'communityUpdates') setChallengeUpdates(val);
+
+    try {
+      const nextSettings = {
+        workoutReminders: key === 'workoutReminders' ? val : workoutReminders,
+        streakAlerts: key === 'streakAlerts' ? val : streakAlerts,
+        communityUpdates: key === 'communityUpdates' ? val : challengeUpdates,
+      };
+      const res = await userService.updateNotificationSettings(nextSettings);
+      if (res.success && res.data) {
+        updateUser({ notificationSettings: res.data });
+      }
+    } catch {}
+  };
+
+  const handleToggleUnits = async () => {
+    const nextUnits = units === 'metric' ? 'imperial' : 'metric';
+    setUnits(nextUnits);
+    try {
+      await userService.updateProfile({ units: nextUnits });
+      if (user?.onboarding) {
+        updateUser({
+          onboarding: { ...user.onboarding, units: nextUnits },
+        });
+      }
+    } catch {}
+  };
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteInputText, setDeleteInputText] = useState('');
@@ -72,7 +115,13 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Main');
+            }
+          }}
           activeOpacity={0.7}
         >
           <View style={{ transform: [{ rotate: '180deg' }] }}>
@@ -100,7 +149,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Switch
                 value={workoutReminders}
-                onValueChange={setWorkoutReminders}
+                onValueChange={(val) => handleToggleNotification('workoutReminders', val)}
                 trackColor={{ false: '#E0E0E0', true: '#FE2E31' }}
                 thumbColor="#FFFFFF"
               />
@@ -116,7 +165,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Switch
                 value={streakAlerts}
-                onValueChange={setStreakAlerts}
+                onValueChange={(val) => handleToggleNotification('streakAlerts', val)}
                 trackColor={{ false: '#E0E0E0', true: '#FE2E31' }}
                 thumbColor="#FFFFFF"
               />
@@ -132,7 +181,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Switch
                 value={challengeUpdates}
-                onValueChange={setChallengeUpdates}
+                onValueChange={(val) => handleToggleNotification('communityUpdates', val)}
                 trackColor={{ false: '#E0E0E0', true: '#FE2E31' }}
                 thumbColor="#FFFFFF"
               />
@@ -154,7 +203,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <TouchableOpacity
                 style={styles.unitToggleBtn}
-                onPress={() => setUnits(units === 'metric' ? 'imperial' : 'metric')}
+                onPress={handleToggleUnits}
                 activeOpacity={0.8}
               >
                 <Text style={styles.unitToggleText}>
